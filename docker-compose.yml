@@ -1,8 +1,13 @@
-version: '3'
+version: '3.8'
 
 services:
   payload:
     image: node:18-alpine
+    deploy:
+      resources:
+        limits:
+          memory: 4G
+          cpus: '2.0'
     ports:
       - '3000:3000'
     volumes:
@@ -11,21 +16,41 @@ services:
     working_dir: /home/node/app/
     command: sh -c "yarn install && yarn dev"
     depends_on:
-      - mongo
-    env_file:
-      - .env
+      db:
+        condition: service_healthy
+    environment:
+      NODE_ENV: development
+      NODE_OPTIONS: --max-old-space-size=4096
+      DATABASE_URI: postgres://postgres:Miniclip@123@db:5432/newspaper-cms
+      PAYLOAD_SECRET: ${PAYLOAD_SECRET}
+      PAYLOAD_PUBLIC_SERVER_URL: ${PAYLOAD_PUBLIC_SERVER_URL}
+      NEXT_PUBLIC_SERVER_URL: ${NEXT_PUBLIC_SERVER_URL}
+      PAYLOAD_PUBLIC_DRAFT_SECRET: ${PAYLOAD_PUBLIC_DRAFT_SECRET}
+      NEXT_PRIVATE_DRAFT_SECRET: ${NEXT_PRIVATE_DRAFT_SECRET}
+      REVALIDATION_KEY: ${REVALIDATION_KEY}
+      NEXT_PRIVATE_REVALIDATION_KEY: ${NEXT_PRIVATE_REVALIDATION_KEY}
 
-  mongo:
-    image: mongo:latest
+  db:
+    image: postgres:15-alpine
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+          cpus: '0.5'
+    environment:
+      POSTGRES_DB: newspaper-cms
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: Miniclip@123
     ports:
-      - '27017:27017'
-    command:
-      - --storageEngine=wiredTiger
+      - "5432:5432"
     volumes:
-      - data:/data/db
-    logging:
-      driver: none
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
 
 volumes:
-  data:
   node_modules:
+  postgres_data:
